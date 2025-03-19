@@ -24,6 +24,7 @@ def test_function_run(test_automation_run_data: AutomationRunData, test_automati
         automate_function,
         FunctionInputs(
         file_name = "TestFileNikos",
+        calculate_structural = False,
         categories = '',
         parameters = '',
         group_by_level= False,

@@ -29,6 +29,12 @@ class FunctionInputs(AutomateBase):
         description="The name of the Excel file.",
     )
 
+    calculate_structural: bool = Field(
+        default=False,
+        title="Type Structural Parameters (Optional)",
+        description="If enabled, it extracts Type Structural Parameters together with Material Quantities.",
+    )
+
     categories: str = Field(
         title="Revit Categories (Optional)",
         description="A list of revit categories to use, if empty then calculate all elements.",
@@ -37,7 +43,7 @@ class FunctionInputs(AutomateBase):
 
     parameters: str = Field(
         title="Parameters (Optional)",
-        description="A list of revit parameters to extract together with Material Quantities.",
+        description="A list of revit parameters to extract together with Material Quantities, Level, Category, Family and Type.",
         default = ""
     )
 
@@ -66,6 +72,7 @@ class FunctionInputs(AutomateBase):
     )
 
 
+
 def automate_function(
     automate_context: AutomationContext,
     function_inputs: FunctionInputs,
@@ -84,13 +91,7 @@ def automate_function(
 
     all_objects = list(flatten_base(version_root_object))
 
-
     file_name = function_inputs.file_name
-
-    if function_inputs.categories:
-        print(True)
-    else:
-        print(False)
 
     filter_categories = [categ.strip() for categ in function_inputs.categories.split(",")]
     list_prop = [prop.strip() for prop in function_inputs.parameters.split(",")]
@@ -99,6 +100,8 @@ def automate_function(
     group_by_category = function_inputs.group_by_category
     group_by_type = function_inputs.group_by_type
     group_by_materialName = function_inputs.group_by_materialName
+
+    include_structural = function_inputs.calculate_structural
 
     # Define mapping of booleans to column names
     group_columns = []
@@ -120,7 +123,7 @@ def automate_function(
         
     try:
         # Extract material data from the appropriate object set
-        material_dataset = extract_material_data(filtered_items, list_prop)
+        material_dataset = extract_material_data(filtered_items, list_prop, include_structural)
     except Exception as e:
         automate_context.mark_run_failed(f"Something went wrong when extrecting material data. Exception detail: {e}") 
 
@@ -166,25 +169,6 @@ def automate_function(
 
         # Pass CSV file to function
         automate_context.store_file_result(f"./{xlsx_filename}")
-
-
-
-
-
-
-    # If the function generates file results, this is how it can be
-    # attached to the Speckle project/model
-    # automate_context.store_file_result("./report.pdf")
-
-
-def automate_function_without_inputs(automate_context: AutomationContext) -> None:
-    """A function example without inputs.
-
-    If your function does not need any input variables,
-     besides what the automation context provides,
-     the inputs argument can be omitted.
-    """
-    pass
 
 
 # make sure to call the function with the executor

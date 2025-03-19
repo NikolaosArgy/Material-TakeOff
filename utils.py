@@ -65,7 +65,7 @@ def get_nested_attr(obj, attr_path, default=None):
     except AttributeError:
         return default
 
-def extract_material_data(all_objects, other_params, include_structural=False):
+def extract_material_data(all_objects, other_params, include_structural):
     """
     Extracts material data from a list of objects, including additional parameters and level name.
 
