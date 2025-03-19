@@ -23,8 +23,13 @@ def test_function_run(test_automation_run_data: AutomationRunData, test_automati
         automation_context,
         automate_function,
         FunctionInputs(
-            forbidden_speckle_type="None",
-            whisper_message=SecretStr("testing automatically"),
+        file_name = "TestFileNikos",
+        categories = '',
+        parameters = '',
+        group_by_level= False,
+        group_by_category= False,
+        group_by_type= False,
+        group_by_materialName = False
         ),
     )
 

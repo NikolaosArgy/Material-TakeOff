@@ -10,7 +10,10 @@ from speckle_automate import (
     execute_automate_function,
 )
 
-from flatten import flatten_base
+import pandas as pd
+from datetime import datetime
+
+from utils import flatten_base, filter_objects_by_category, extract_material_data
 
 
 class FunctionInputs(AutomateBase):
@@ -21,14 +24,45 @@ class FunctionInputs(AutomateBase):
     https://docs.pydantic.dev/latest/usage/models/
     """
 
-    # An example of how to use secret values.
-    whisper_message: SecretStr = Field(title="This is a secret message")
-    forbidden_speckle_type: str = Field(
-        title="Forbidden speckle type",
-        description=(
-            "If a object has the following speckle_type,"
-            " it will be marked with an error."
-        ),
+    file_name: str = Field(
+        title="File Name",
+        description="The name of the Excel file.",
+    )
+
+    categories: str = Field(
+        title="Revit Categories (Optional)",
+        description="A list of revit categories to use, if empty then calculate all elements.",
+        default = ""
+    )
+
+    parameters: str = Field(
+        title="Parameters (Optional)",
+        description="A list of revit parameters to extract together with Material Quantities.",
+        default = ""
+    )
+
+    group_by_level: bool = Field(
+        default=False,
+        title="Group by Level",
+        description="If enabled, it groups the quantities by Level",
+    )
+
+    group_by_category: bool = Field(
+        default=False,
+        title="Group by Category",
+        description="If enabled, it groups the quantities by Category",
+    )
+
+    group_by_type: bool = Field(
+        default=False,
+        title="Group by Type",
+        description="If enabled, it groups the quantities by Type",
+    )
+
+    group_by_materialName: bool = Field(
+        default=False,
+        title="Group by materialName",
+        description="If enabled, it groups the quantities by Material Name",
     )
 
 
@@ -48,34 +82,83 @@ def automate_function(
     # The context provides a convenient way to receive the triggering version.
     version_root_object = automate_context.receive_version()
 
-    objects_with_forbidden_speckle_type = [
-        b
-        for b in flatten_base(version_root_object)
-        if b.speckle_type == function_inputs.forbidden_speckle_type
-    ]
-    count = len(objects_with_forbidden_speckle_type)
+    all_objects = list(flatten_base(version_root_object))
 
-    if count > 0:
-        # This is how a run is marked with a failure cause.
-        automate_context.attach_error_to_objects(
-            category="Forbidden speckle_type"
-            f" ({function_inputs.forbidden_speckle_type})",
-            object_ids=[o.id for o in objects_with_forbidden_speckle_type if o.id],
-            message="This project should not contain the type: "
-            f"{function_inputs.forbidden_speckle_type}",
-        )
-        automate_context.mark_run_failed(
-            "Automation failed: "
-            f"Found {count} object that have one of the forbidden speckle types: "
-            f"{function_inputs.forbidden_speckle_type}"
-        )
 
-        # Set the automation context view to the original model/version view
-        # to show the offending objects.
-        automate_context.set_context_view()
+    file_name = function_inputs.file_name
 
+    if function_inputs.categories:
+        print(True)
     else:
-        automate_context.mark_run_success("No forbidden types found.")
+        print(False)
+
+    filter_categories = [categ.strip() for categ in function_inputs.categories.split(",")]
+    list_prop = [prop.strip() for prop in function_inputs.parameters.split(",")]
+    
+    group_by_level = function_inputs.group_by_level
+    group_by_category = function_inputs.group_by_category
+    group_by_type = function_inputs.group_by_type
+    group_by_materialName = function_inputs.group_by_materialName
+
+    # Define mapping of booleans to column names
+    group_columns = []
+
+    if group_by_level:
+        group_columns.append("Level Name")
+    if group_by_category:
+        group_columns.append("Category")
+    if group_by_type:
+        group_columns.append("Type")
+    if group_by_materialName:
+        group_columns.append("materialName")
+
+    # Apply filtering if categories are specified
+    if function_inputs.categories:
+        filtered_items = filter_objects_by_category(all_objects, filter_categories)
+    else:
+        filtered_items = all_objects
+        
+    #vars(filtered_items[0])
+    # Extract material data from the appropriate object set
+    material_dataset = extract_material_data(filtered_items, list_prop)
+
+    # Convert to DataFrame
+    df = pd.DataFrame(material_dataset)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    xlsx_filename = f"{file_name}_{timestamp}.xlsx"
+
+    # Ensure there's at least one grouping column
+    if not group_columns:
+        #df.to_csv(csv_filename, index=False)
+        with pd.ExcelWriter(xlsx_filename, engine="xlsxwriter") as writer: df.to_excel(writer, sheet_name="Sheet1", index=False)
+
+        # Pass CSV file to function
+        automate_context.store_file_result(f"./{xlsx_filename}")
+    else:
+        print("hey the g col:", group_columns)
+        # Group by 'Level Name' and 'Category' and count the occurrences
+        df_grouped = df.groupby([group_columns]).agg(lambda x: ', '.join(set(x.astype(str))))
+
+        # Add a new column 'Quantity' that counts the number of rows in each group
+        df_grouped["Quantity"] = df.groupby([group_columns]).size()
+
+        # Move 'Quantity' to the front
+        df_grouped = df_grouped.reset_index()
+        cols = ["Quantity"] + [col for col in df_grouped.columns if col != "Quantity"]
+        df_grouped = df_grouped[cols]
+
+        #df.to_csv(csv_filename, index=False)
+        with pd.ExcelWriter(xlsx_filename, engine="xlsxwriter") as writer: df_grouped.to_excel(writer, sheet_name="Sheet1", index=False)
+
+        # Pass CSV file to function
+        automate_context.store_file_result(f"./{xlsx_filename}")
+
+
+
+
+
 
     # If the function generates file results, this is how it can be
     # attached to the Speckle project/model
