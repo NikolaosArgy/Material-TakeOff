@@ -118,9 +118,11 @@ def automate_function(
     else:
         filtered_items = all_objects
         
-    #vars(filtered_items[0])
-    # Extract material data from the appropriate object set
-    material_dataset = extract_material_data(filtered_items, list_prop)
+    try:
+        # Extract material data from the appropriate object set
+        material_dataset = extract_material_data(filtered_items, list_prop)
+    except Exception as e:
+        automate_context.mark_run_failed(f"Something went wrong when extrecting material data. Exception detail: {e}") 
 
     # Convert to DataFrame
     df = pd.DataFrame(material_dataset)
@@ -131,26 +133,36 @@ def automate_function(
 
     # Ensure there's at least one grouping column
     if not group_columns:
-        #df.to_csv(csv_filename, index=False)
-        with pd.ExcelWriter(xlsx_filename, engine="xlsxwriter") as writer: df.to_excel(writer, sheet_name="Sheet1", index=False)
+        try:
+            #df.to_csv(csv_filename, index=False)
+            with pd.ExcelWriter(xlsx_filename, engine="xlsxwriter") as writer: df.to_excel(writer, sheet_name="Sheet1", index=False)
 
-        # Pass CSV file to function
-        automate_context.store_file_result(f"./{xlsx_filename}")
+            # Pass CSV file to function
+            automate_context.store_file_result(f"./{xlsx_filename}")
+        except Exception as e:
+            automate_context.mark_run_failed(f"Something went wrong when writing to excel all elements (no grouping). Exception detail: {e}") 
     else:
-        print("hey the g col:", group_columns)
-        # Group by 'Level Name' and 'Category' and count the occurrences
-        df_grouped = df.groupby([group_columns]).agg(lambda x: ', '.join(set(x.astype(str))))
+        try:
+            # Group by 'materialName'
+            df_grouped = df.groupby(group_columns).agg(
+                # For numeric columns: sum them
+                # For non-numeric columns: join unique values
+                lambda x: x.sum() if pd.api.types.is_numeric_dtype(x) else ', '.join(set(x.astype(str)))
+            )
 
-        # Add a new column 'Quantity' that counts the number of rows in each group
-        df_grouped["Quantity"] = df.groupby([group_columns]).size()
+            # Add a new column 'Quantity' that counts the number of rows in each group
+            df_grouped["Quantity"] = df.groupby(group_columns).size()
 
-        # Move 'Quantity' to the front
-        df_grouped = df_grouped.reset_index()
-        cols = ["Quantity"] + [col for col in df_grouped.columns if col != "Quantity"]
-        df_grouped = df_grouped[cols]
+            # Move 'Quantity' to the front
+            df_grouped = df_grouped.reset_index()
+            cols = ["Quantity"] + [col for col in df_grouped.columns if col != "Quantity"]
+            df_grouped = df_grouped[cols]
 
-        #df.to_csv(csv_filename, index=False)
-        with pd.ExcelWriter(xlsx_filename, engine="xlsxwriter") as writer: df_grouped.to_excel(writer, sheet_name="Sheet1", index=False)
+            #df.to_csv(csv_filename, index=False)
+            with pd.ExcelWriter(xlsx_filename, engine="xlsxwriter") as writer: df_grouped.to_excel(writer, sheet_name="Sheet1", index=False)
+        except Exception as e:
+            automate_context.mark_run_failed(f"Something went wrong when grouping. Exception detail: {e}") 
+
 
         # Pass CSV file to function
         automate_context.store_file_result(f"./{xlsx_filename}")
