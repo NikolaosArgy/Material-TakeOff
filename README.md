@@ -11,10 +11,10 @@ Seamlessly integrate the exported data with **reporting tools** or **dashboards*
 ## 📏 Group and Quantify  
 
 Organize material data efficiently by grouping by:  
-- **Level**  
-- **Category**  
-- **Type**  
-- **Material Name**  
+🔸 **Level**  
+🔸 **Category**  
+🔸 **Type**  
+🔸 **Material Name**  
 
 Automatically generate **comprehensive summaries** including:  
 ✅ **Area**  
