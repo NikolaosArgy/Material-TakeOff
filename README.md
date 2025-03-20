@@ -1,3 +1,6 @@
+
+![Blog Image_1920x1080 (2)](https://github.com/user-attachments/assets/1c5eabfa-cad6-49a8-8c10-77df93e629c7)
+
 # 🚀 Automate Material Data Extraction from Revit Models – No Coding Required  
 
 Easily export all **Material Quantities** along with **Level, Category, Family, and Type** into an Excel file in seconds, ensuring **accurate and up-to-date project data**.  
