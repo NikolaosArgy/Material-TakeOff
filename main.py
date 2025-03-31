@@ -77,15 +77,6 @@ def automate_function(
     automate_context: AutomationContext,
     function_inputs: FunctionInputs,
 ) -> None:
-    """This is an example Speckle Automate function.
-
-    Args:
-        automate_context: A context-helper object that carries relevant information
-            about the runtime context of this function.
-            It gives access to the Speckle project data that triggered this run.
-            It also has convenient methods for attaching result data to the Speckle model.
-        function_inputs: An instance object matching the defined schema.
-    """
     # The context provides a convenient way to receive the triggering version.
     version_root_object = automate_context.receive_version()
 
@@ -141,6 +132,7 @@ def automate_function(
             with pd.ExcelWriter(xlsx_filename, engine="xlsxwriter") as writer: df.to_excel(writer, sheet_name="Sheet1", index=False)
 
             # Pass CSV file to function
+            automate_context.mark_run_success("Success! You can download the Excel file below.")
             automate_context.store_file_result(f"./{xlsx_filename}")
         except Exception as e:
             automate_context.mark_run_failed(f"Something went wrong when writing to excel all elements (no grouping). Exception detail: {e}") 
@@ -162,7 +154,39 @@ def automate_function(
             df_grouped = df_grouped[cols]
 
             #df.to_csv(csv_filename, index=False)
-            with pd.ExcelWriter(xlsx_filename, engine="xlsxwriter") as writer: df_grouped.to_excel(writer, sheet_name="Sheet1", index=False)
+            with pd.ExcelWriter(xlsx_filename, engine="xlsxwriter") as writer:
+                df_grouped.to_excel(writer, sheet_name="Sheet1", index=False)
+                
+                # Get the workbook and worksheet
+                workbook = writer.book
+                worksheet = writer.sheets["Sheet1"]
+                
+                # Create a bar chart
+                chart = workbook.add_chart({"type": "bar"})
+                
+                # Define data range (excluding header)
+                max_row = len(df_grouped) + 1  # +1 for header row
+                
+                # Add series to the chart (Y = Quantity, X = first column after Quantity)
+                chart.add_series({
+                    "name": "Quantity",
+                    "categories": f"=Sheet1!B2:B{max_row}",  # X-axis (second column)
+                    "values": f"=Sheet1!A2:A{max_row}",      # Y-axis (Quantity)
+                    "gap": 50,  # Adjust bar spacing
+                })
+                
+                # Set chart title and labels
+                chart.set_title({"name": f"Quantity x {group_columns[0]}"})
+                chart.set_x_axis({"name": df_grouped.columns[1]})
+                chart.set_y_axis({"name": "Quantity"})
+                
+                # Determine the row where the chart should start (table size + 2 rows for spacing)
+                chart_row = len(df_grouped) + 3  # +1 for header, +2 for spacing
+
+                # Insert chart dynamically below the table
+                worksheet.insert_chart(f"D{chart_row}", chart)
+            
+            automate_context.mark_run_success("Success! You can download the Excel file below.")
         except Exception as e:
             automate_context.mark_run_failed(f"Something went wrong when grouping. Exception detail: {e}") 
 
